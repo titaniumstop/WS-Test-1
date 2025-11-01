@@ -66,12 +66,18 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const gameOverDiv = document.getElementById('gameOver');
 
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
     initializeDots();
     window.requestAnimationFrame(gameLoop);
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
 
 function initializeDots() {
     state.dots = [];
@@ -265,10 +271,22 @@ function handleKeyUp(e) {}
 function render() {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawWalls();
     drawDots();
     drawPlayer();
     drawGhosts();
     drawHUD();
+}
+
+function drawWalls() {
+    ctx.fillStyle = '#00f';
+    for (let y = 0; y < state.grid.length; y++) {
+        for (let x = 0; x < state.grid[y].length; x++) {
+            if (state.grid[y][x] === 1) {
+                ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+            }
+        }
+    }
 }
 
 function drawDots() {

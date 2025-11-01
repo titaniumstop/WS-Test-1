@@ -1,9 +1,9 @@
 [build]
-  publish = "."
+  publish = "web"
   command = ""
 
 [dev]
-  publish = "."
+  publish = "web"
   framework = "none"
   command = ""
 

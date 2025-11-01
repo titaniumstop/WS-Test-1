@@ -389,8 +389,4 @@ function drawHUD() {
     // Draw lives
     ctx.textAlign = 'right';
     ctx.fillText(`Lives: ${state.lives}`, canvas.width - 10, 20);
-    
-    // Debug tick (ensures rendering visible)
-    ctx.textAlign = 'center';
-    ctx.fillText(`Dots: ${state.dots.length}`, canvas.width / 2, 20);
 }

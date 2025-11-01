@@ -8,11 +8,11 @@
   framework = "none"
   command = ""
 
-# Optional caching headers for static assets
+# Ensure the latest game logic is always fetched
 [[headers]]
-  for = "/*.js"
+  for = "/game.js"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+    Cache-Control = "max-age=0, no-cache, no-store, must-revalidate"
 
 [[headers]]
   for = "/*.css"

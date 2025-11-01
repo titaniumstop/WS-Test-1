@@ -41,8 +41,9 @@ const state = {
     dots: [],
     walls: [],
     player: {
-        x: 14 * TILE_SIZE + TILE_SIZE/2,
-        y: 23 * TILE_SIZE + TILE_SIZE/2,
+        // Start on a guaranteed open tile
+        x: 1 * TILE_SIZE + TILE_SIZE/2,
+        y: 1 * TILE_SIZE + TILE_SIZE/2,
         dx: 0,
         dy: 0,
         nextDir: null,
@@ -53,10 +54,10 @@ const state = {
         mouthSpeed: 0.1
     },
     ghosts: [
-        { x: 14 * TILE_SIZE, y: 11 * TILE_SIZE, dx: GHOST_SPEED, dy: 0, color: '#FF0000', mode: 'chase' },
-        { x: 13 * TILE_SIZE, y: 14 * TILE_SIZE, dx: -GHOST_SPEED, dy: 0, color: '#FFA500', mode: 'chase' },
-        { x: 14 * TILE_SIZE, y: 14 * TILE_SIZE, dx: 0, dy: 0, color: '#00FFFF', mode: 'chase' },
-        { x: 15 * TILE_SIZE, y: 14 * TILE_SIZE, dx: 0, dy: 0, color: '#FF69B4', mode: 'chase' }
+        { x: 14 * TILE_SIZE + TILE_SIZE/2, y: 11 * TILE_SIZE + TILE_SIZE/2, dx: GHOST_SPEED, dy: 0, color: '#FF0000', mode: 'chase' },
+        { x: 13 * TILE_SIZE + TILE_SIZE/2, y: 14 * TILE_SIZE + TILE_SIZE/2, dx: -GHOST_SPEED, dy: 0, color: '#FFA500', mode: 'chase' },
+        { x: 14 * TILE_SIZE + TILE_SIZE/2, y: 14 * TILE_SIZE + TILE_SIZE/2, dx: 0, dy: GHOST_SPEED, color: '#00FFFF', mode: 'chase' },
+        { x: 15 * TILE_SIZE + TILE_SIZE/2, y: 14 * TILE_SIZE + TILE_SIZE/2, dx: 0, dy: -GHOST_SPEED, color: '#FF69B4', mode: 'chase' }
     ],
     lastTime: 0,
     grid: [...GRID.map(row => [...row])] // Deep copy of the grid
@@ -173,27 +174,94 @@ function updatePlayer() {
 }
 
 function updateGhosts() {
+    const atCenter = (x, y) => {
+        const cx = (x - TILE_SIZE / 2) % TILE_SIZE;
+        const cy = (y - TILE_SIZE / 2) % TILE_SIZE;
+        return Math.abs(cx) < 0.5 && Math.abs(cy) < 0.5;
+    };
+
     state.ghosts.forEach(ghost => {
-        const directions = [
-            { dx: 1, dy: 0 },
-            { dx: -1, dy: 0 },
-            { dx: 0, dy: 1 },
-            { dx: 0, dy: -1 }
-        ];
-        const validDirs = directions.filter(dir => {
-            const nextX = Math.floor((ghost.x + dir.dx * TILE_SIZE) / TILE_SIZE);
-            const nextY = Math.floor((ghost.y + dir.dy * TILE_SIZE) / TILE_SIZE);
-            return canMoveTo(nextX, nextY);
-        });
-        if (validDirs.length > 0) {
-            const dir = validDirs[Math.floor(Math.random() * validDirs.length)];
-            ghost.dx = dir.dx * (ghost.mode === 'frightened' ? GHOST_SPEED * 0.5 : GHOST_SPEED);
-            ghost.dy = dir.dy * (ghost.mode === 'frightened' ? GHOST_SPEED * 0.5 : GHOST_SPEED);
+        // Change direction only when near tile center
+        if (atCenter(ghost.x, ghost.y)) {
+            const gx = Math.floor(ghost.x / TILE_SIZE);
+            const gy = Math.floor(ghost.y / TILE_SIZE);
+            const cur = { dx: Math.sign(ghost.dx), dy: Math.sign(ghost.dy) };
+            const reverse = { dx: -cur.dx, dy: -cur.dy };
+            const choices = [
+                { dx: 1, dy: 0 },
+                { dx: -1, dy: 0 },
+                { dx: 0, dy: 1 },
+                { dx: 0, dy: -1 }
+            ];
+            // Valid paths excluding immediate reversal
+            let valid = choices.filter(d => !(d.dx === reverse.dx && d.dy === reverse.dy))
+                .filter(d => canMoveTo(gx + d.dx, gy + d.dy));
+            if (valid.length === 0) {
+                // Allow reverse if no other option
+                if (canMoveTo(gx + reverse.dx, gy + reverse.dy)) {
+                    valid = [reverse];
+                }
+            }
+            if (valid.length > 0) {
+                const pick = valid[Math.floor(Math.random() * valid.length)];
+                const spd = (ghost.mode === 'frightened' ? GHOST_SPEED * 0.5 : GHOST_SPEED);
+                ghost.dx = pick.dx * spd;
+                ghost.dy = pick.dy * spd;
+            }
         }
-        ghost.x += ghost.dx;
-        ghost.y += ghost.dy;
+
+        // If next step would enter a wall, stop and re-choose direction
+        const nextGX = Math.floor((ghost.x + ghost.dx) / TILE_SIZE);
+        const nextGY = Math.floor((ghost.y + ghost.dy) / TILE_SIZE);
+        if (!canMoveTo(nextGX, nextGY)) {
+            // Snap to center of current tile
+            const cx = Math.floor(ghost.x / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
+            const cy = Math.floor(ghost.y / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
+            ghost.x = cx;
+            ghost.y = cy;
+            // Choose a new direction now
+            const gx = Math.floor(ghost.x / TILE_SIZE);
+            const gy = Math.floor(ghost.y / TILE_SIZE);
+            const cur = { dx: Math.sign(ghost.dx), dy: Math.sign(ghost.dy) };
+            const reverse = { dx: -cur.dx, dy: -cur.dy };
+            const options = [
+                { dx: 1, dy: 0 },
+                { dx: -1, dy: 0 },
+                { dx: 0, dy: 1 },
+                { dx: 0, dy: -1 }
+            ];
+            let valid2 = options.filter(d => !(d.dx === reverse.dx && d.dy === reverse.dy))
+                .filter(d => canMoveTo(gx + d.dx, gy + d.dy));
+            if (valid2.length === 0 && canMoveTo(gx + reverse.dx, gy + reverse.dy)) {
+                valid2 = [reverse];
+            }
+            if (valid2.length > 0) {
+                const pick = valid2[Math.floor(Math.random() * valid2.length)];
+                const spd = (ghost.mode === 'frightened' ? GHOST_SPEED * 0.5 : GHOST_SPEED);
+                ghost.dx = pick.dx * spd;
+                ghost.dy = pick.dy * spd;
+            } else {
+                ghost.dx = 0;
+                ghost.dy = 0;
+            }
+        } else {
+            // Move ghost
+            ghost.x += ghost.dx;
+            ghost.y += ghost.dy;
+        }
+
+        // Tunnel through sides
         if (ghost.x < 0) ghost.x = canvas.width - 1;
         if (ghost.x >= canvas.width) ghost.x = 1;
+
+        // Keep aligned to corridor: when moving horizontally, snap Y to tile center; vertically, snap X
+        const centerX = Math.floor(ghost.x / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
+        const centerY = Math.floor(ghost.y / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
+        if (Math.abs(ghost.dx) > Math.abs(ghost.dy)) {
+            ghost.y = centerY;
+        } else if (Math.abs(ghost.dy) > Math.abs(ghost.dx)) {
+            ghost.x = centerX;
+        }
     });
 }
 
@@ -220,15 +288,16 @@ function checkCollisions() {
 }
 
 function resetPositions() {
-    state.player.x = 14 * TILE_SIZE + TILE_SIZE/2;
-    state.player.y = 23 * TILE_SIZE + TILE_SIZE/2;
+    // Reset to the same guaranteed open tile
+    state.player.x = 1 * TILE_SIZE + TILE_SIZE/2;
+    state.player.y = 1 * TILE_SIZE + TILE_SIZE/2;
     state.player.dx = 0;
     state.player.dy = 0;
     state.ghosts = [
-        { x: 14 * TILE_SIZE, y: 11 * TILE_SIZE, dx: GHOST_SPEED, dy: 0, color: '#FF0000', mode: 'chase' },
-        { x: 13 * TILE_SIZE, y: 14 * TILE_SIZE, dx: -GHOST_SPEED, dy: 0, color: '#FFA500', mode: 'chase' },
-        { x: 14 * TILE_SIZE, y: 14 * TILE_SIZE, dx: 0, dy: 0, color: '#00FFFF', mode: 'chase' },
-        { x: 15 * TILE_SIZE, y: 14 * TILE_SIZE, dx: 0, dy: 0, color: '#FF69B4', mode: 'chase' }
+        { x: 14 * TILE_SIZE + TILE_SIZE/2, y: 11 * TILE_SIZE + TILE_SIZE/2, dx: GHOST_SPEED, dy: 0, color: '#FF0000', mode: 'chase' },
+        { x: 13 * TILE_SIZE + TILE_SIZE/2, y: 14 * TILE_SIZE + TILE_SIZE/2, dx: -GHOST_SPEED, dy: 0, color: '#FFA500', mode: 'chase' },
+        { x: 14 * TILE_SIZE + TILE_SIZE/2, y: 14 * TILE_SIZE + TILE_SIZE/2, dx: 0, dy: GHOST_SPEED, color: '#00FFFF', mode: 'chase' },
+        { x: 15 * TILE_SIZE + TILE_SIZE/2, y: 14 * TILE_SIZE + TILE_SIZE/2, dx: 0, dy: -GHOST_SPEED, color: '#FF69B4', mode: 'chase' }
     ];
 }
 
@@ -389,4 +458,10 @@ function drawHUD() {
     // Draw lives
     ctx.textAlign = 'right';
     ctx.fillText(`Lives: ${state.lives}`, canvas.width - 10, 20);
+    
+    // Debug info: player tile and velocity
+    const pgx = Math.floor(state.player.x / TILE_SIZE);
+    const pgy = Math.floor(state.player.y / TILE_SIZE);
+    ctx.textAlign = 'center';
+    ctx.fillText(`Tile: (${pgx},${pgy})  Vel: (${state.player.dx.toFixed(1)},${state.player.dy.toFixed(1)})`, canvas.width / 2, 20);
 }

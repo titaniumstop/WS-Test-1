@@ -68,7 +68,17 @@ const gameOverDiv = document.getElementById('gameOver');
 
 function init() {
     initializeDots();
+    // Start RAF loop
     window.requestAnimationFrame(gameLoop);
+    // Fallback update/render interval in case RAF is throttled
+    if (!window.__pacmanInterval) {
+        window.__pacmanInterval = setInterval(() => {
+            if (!state.gameOver) {
+                update(16);
+                render();
+            }
+        }, 1000 / 30);
+    }
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
 }
@@ -375,6 +385,12 @@ function drawHUD() {
     ctx.font = '16px Arial';
     ctx.textAlign = 'left';
     ctx.fillText(`Score: ${state.score}`, 10, 20);
+    
+    // Draw lives
     ctx.textAlign = 'right';
     ctx.fillText(`Lives: ${state.lives}`, canvas.width - 10, 20);
+    
+    // Debug tick (ensures rendering visible)
+    ctx.textAlign = 'center';
+    ctx.fillText(`Dots: ${state.dots.length}`, canvas.width / 2, 20);
 }
